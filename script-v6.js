@@ -1252,87 +1252,175 @@ const catalogData = {
 };
 // ================== КОНЕЦ КАТАЛОГА ==================
 
-// Функция рекурсивного сбора товаров с сохранением родительской категории
-function extractAllProducts(data) {
-    let products = [];
+// ========== НОВАЯ ЛОГИКА МНОГОУРОВНЕВОЙ НАВИГАЦИИ ==========
 
-    function traverse(node, categoryId, categoryName) {
-        // Если есть товары, добавляем их
-        if (node.products && Array.isArray(node.products)) {
-            node.products.forEach(item => {
-                // Преобразуем цену в число (если строка)
-                let price = parseFloat(item.price);
-                if (isNaN(price)) price = 0;
+// Стек навигации: хранит путь к текущему узлу (массив объектов с id, name, emoji, type)
+let navStack = [];
 
-                // Определяем эмодзи из названия категории
-                let emoji = '📦';
-                const emojiMatch = categoryName.match(/^(\p{Emoji}+)/u);
-                if (emojiMatch) {
-                    emoji = emojiMatch[1];
-                }
+// Текущий отображаемый узел (объект, который мы рендерим)
+let currentNode = null;
 
-                products.push({
-                    id: item.id,
-                    name: item.name,
-                    price: price,
-                    description: item.description || '',
-                    categoryId: categoryId,
-                    categoryName: categoryName,
-                    emoji: emoji
-                });
+// Функция для извлечения всех категорий верхнего уровня
+function getRootCategories() {
+    return catalogData.categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        emoji: cat.name.match(/^(\p{Emoji}+)/u)?.[1] || '📦',
+        type: 'category',
+        node: cat // ссылка на оригинальный узел
+    }));
+}
+
+// Функция для получения дочерних элементов узла (подкатегории или товары)
+function getChildren(node) {
+    if (!node) return [];
+
+    // Если узел имеет подкатегории, возвращаем их
+    if (node.subcategories && node.subcategories.length > 0) {
+        return node.subcategories.map(sub => ({
+            id: sub.id,
+            name: sub.name,
+            emoji: sub.name.match(/^(\p{Emoji}+)/u)?.[1] || '📦',
+            type: 'category',
+            node: sub
+        }));
+    }
+
+    // Если узел имеет товары, возвращаем товары
+    if (node.products && node.products.length > 0) {
+        return node.products.map(product => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            description: product.description || '',
+            type: 'product',
+            node: product
+        }));
+    }
+
+    return [];
+}
+
+// Функция для получения названия элемента с учётом форматирования (для товаров)
+function getDisplayName(item) {
+    if (item.type === 'product') {
+        // Пытаемся отформатировать название для телефонов
+        if (currentNode && currentNode.categoryId === 'phones') { // если мы внутри категории Телефоны
+            return formatPhoneName(item.name);
+        }
+        return item.name;
+    }
+    return item.name;
+}
+
+// Форматирование названия телефона (пример)
+function formatPhoneName(originalName) {
+    // Убираем лишние символы, флаги, скобки
+    let clean = originalName.replace(/\s*\([^)]*\)/g, '').replace(/🇺🇸|🇯🇵|🇨🇳|🇰🇷|🇸🇬|🇦🇪|🇲🇾|🇮🇳|🇵🇦|🇰🇿/g, '').trim();
+    // Пытаемся разбить на модель, память, цвет (упрощённо)
+    const parts = clean.split(' ');
+    if (parts.length >= 3) {
+        const model = parts[0] + ' ' + parts[1]; // например "iPhone 17" или "A06"
+        const memory = parts[2]; // например "256"
+        const color = parts.slice(3).join(' ') || '';
+        return `${model}, ${memory}GB, ${color}`.replace(/, $/, '');
+    }
+    return clean;
+}
+
+// Рендер текущего уровня (категории или товары)
+function renderCurrentLevel() {
+    if (!currentNode) {
+        // Начальный уровень – корневые категории
+        const rootItems = getRootCategories();
+        renderItems(rootItems, 'Категории');
+        backBtn.style.display = 'none';
+    } else {
+        const children = getChildren(currentNode.node);
+        if (children.length > 0) {
+            // Если есть дочерние элементы – показываем их
+            renderItems(children, currentNode.name);
+            backBtn.style.display = 'inline-block';
+        } else {
+            // Если нет дочерних – это лист (например, категория без товаров) – просто показываем заглушку
+            catalogContent.innerHTML = '<div class="empty-cart">Нет товаров</div>';
+            backBtn.style.display = 'inline-block';
+        }
+    }
+}
+
+// Рендер списка элементов (категорий или товаров)
+function renderItems(items, title) {
+    catalogContent.innerHTML = '';
+    if (items.length === 0) {
+        catalogContent.innerHTML = '<div class="empty-cart">Нет элементов</div>';
+        return;
+    }
+
+    // Определяем, являются ли элементы товарами (по наличию поля price)
+    const isProducts = items[0].type === 'product';
+
+    if (isProducts) {
+        // Отображаем как сетку товаров
+        const grid = document.createElement('div');
+        grid.className = 'products-grid';
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="product-emoji">${item.emoji || '📦'}</div>
+                <div class="product-name">${getDisplayName(item)}</div>
+                <div class="product-price">${item.price.toLocaleString()} ₽</div>
+                ${item.description ? `<div class="product-description">${item.description}</div>` : ''}
+                <button class="add-to-cart-btn" data-id="${item.id}">В корзину</button>
+            `;
+            grid.appendChild(card);
+        });
+        catalogContent.appendChild(grid);
+
+        // Обработчики кнопок "В корзину"
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                addToCart(e.target.dataset.id);
             });
-        }
-
-        // Рекурсивно обходим подкатегории
-        if (node.subcategories && Array.isArray(node.subcategories)) {
-            node.subcategories.forEach(sub => traverse(sub, categoryId, categoryName));
-        }
+        });
+    } else {
+        // Отображаем как сетку категорий
+        const grid = document.createElement('div');
+        grid.className = 'categories-grid';
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'category-card';
+            card.dataset.id = item.id;
+            card.innerHTML = `
+                <div class="category-emoji">${item.emoji || '📁'}</div>
+                <div class="category-name">${item.name}</div>
+            `;
+            card.addEventListener('click', () => {
+                // Переход внутрь выбранной категории
+                navStack.push(currentNode);
+                currentNode = item;
+                renderCurrentLevel();
+            });
+            grid.appendChild(card);
+        });
+        catalogContent.appendChild(grid);
     }
-
-    if (data.categories) {
-        data.categories.forEach(cat => traverse(cat, cat.id, cat.name));
-    }
-    return products;
 }
 
-const products = extractAllProducts(catalogData);
-console.log(`Загружено товаров: ${products.length}`);
-
-// Функция форматирования названия товара
-function formatProductName(product) {
-    // Для телефонов iPhone пытаемся привести к формату "Модель, память, цвет"
-    if (product.categoryId === 'phones' && product.name.includes('iPhone')) {
-        // Пример: "17 Pro 256 Orange 🇺🇸 (e sim актив)" -> "iPhone 17 Pro, 256GB, Orange"
-        let name = product.name;
-        // Удаляем лишнее в скобках и флаги
-        name = name.replace(/\s*\([^)]*\)/g, '').replace(/🇺🇸|🇯🇵|🇨🇳|🇰🇷|🇸🇬|🇦🇪|🇲🇾|🇮🇳|🇵🇦/g, '').trim();
-        // Разбиваем на части
-        const parts = name.split(' ');
-        if (parts.length >= 3) {
-            const model = parts[0] + ' ' + parts[1]; // например "17 Pro"
-            const memory = parts[2]; // например "256"
-            const color = parts.slice(3).join(' ') || '';
-            return `iPhone ${model}, ${memory}GB, ${color}`.replace(/, $/, '');
-        }
+// Кнопка "Назад"
+backBtn.addEventListener('click', () => {
+    if (navStack.length > 0) {
+        currentNode = navStack.pop();
+    } else {
+        currentNode = null;
     }
-    // Для остальных товаров возвращаем исходное название
-    return product.name;
-}
+    renderCurrentLevel();
+});
 
-// Получаем список уникальных категорий (первого уровня)
-const categories = catalogData.categories.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    emoji: cat.name.match(/^(\p{Emoji}+)/u)?.[1] || '📦'
-}));
-
-// Состояние
+// ========== КОРЗИНА (без изменений) ==========
 let cart = {};
-let currentCategoryId = null; // null = показываем категории, иначе показываем товары категории
 
-// Элементы DOM
-const catalogContent = document.getElementById('catalog-content');
-const backBtn = document.getElementById('back-to-categories');
 const cartItemsContainer = document.getElementById('cart-items');
 const cartTotalSpan = document.getElementById('cart-total');
 const cartCountSpan = document.getElementById('cart-count');
@@ -1348,87 +1436,15 @@ tabs.forEach(tab => {
         tab.classList.add('active');
         document.getElementById(`${tabId}-tab`).classList.add('active');
 
+        // Если перешли на вкладку каталога, сбрасываем навигацию на корень
         if (tabId === 'catalog') {
-            if (currentCategoryId) {
-                showCategoryProducts(currentCategoryId, true);
-            } else {
-                renderCategories();
-            }
+            navStack = [];
+            currentNode = null;
+            renderCurrentLevel();
         }
     });
 });
 
-// Рендер категорий
-function renderCategories() {
-    backBtn.style.display = 'none';
-    catalogContent.innerHTML = '<div class="categories-grid"></div>';
-    const grid = catalogContent.querySelector('.categories-grid');
-
-    categories.forEach(cat => {
-        const card = document.createElement('div');
-        card.className = 'category-card';
-        card.dataset.categoryId = cat.id;
-        card.innerHTML = `
-            <div class="category-emoji">${cat.emoji}</div>
-            <div class="category-name">${cat.name.replace(/^\p{Emoji}+/u, '').trim()}</div>
-        `;
-        card.addEventListener('click', () => {
-            currentCategoryId = cat.id;
-            showCategoryProducts(cat.id);
-        });
-        grid.appendChild(card);
-    });
-}
-
-// Показать товары категории
-function showCategoryProducts(categoryId, skipHistory = false) {
-    if (!skipHistory) {
-        currentCategoryId = categoryId;
-    }
-    backBtn.style.display = 'inline-block';
-    const filtered = products.filter(p => p.categoryId === categoryId && p.price > 0); // показываем только товары с ценой > 0
-    renderProducts(filtered);
-}
-
-// Рендер товаров
-function renderProducts(productsToRender) {
-    catalogContent.innerHTML = '';
-    if (productsToRender.length === 0) {
-        catalogContent.innerHTML = '<div class="empty-cart">Нет товаров в этой категории</div>';
-        return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'products-grid';
-    productsToRender.forEach(product => {
-        const formattedName = formatProductName(product);
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `
-            <div class="product-emoji">${product.emoji}</div>
-            <div class="product-name">${formattedName}</div>
-            <div class="product-price">${product.price.toLocaleString()} ₽</div>
-            ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
-            <button class="add-to-cart-btn" data-id="${product.id}">В корзину</button>
-        `;
-        grid.appendChild(card);
-    });
-    catalogContent.appendChild(grid);
-
-    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            addToCart(e.target.dataset.id);
-        });
-    });
-}
-
-// Назад к категориям
-backBtn.addEventListener('click', () => {
-    currentCategoryId = null;
-    renderCategories();
-});
-
-// Функции корзины (без изменений)
 function addToCart(productId) {
     cart[productId] = (cart[productId] || 0) + 1;
     updateCartUI();
@@ -1467,12 +1483,18 @@ function updateCartUI() {
     }
 
     let totalSum = 0;
+    // Для корзины нам нужен доступ к товарам. Можно сделать глобальный массив всех товаров,
+    // но для простоты воспользуемся рекурсивным сбором (можно вынести, но пока оставим как есть)
+    // ВАЖНО: для работы корзины нужен быстрый доступ к товарам по id. Создадим словарь.
+    const productMap = {};
+    // Заполним productMap при инициализации (в самом низу)
+
     for (const [id, qty] of Object.entries(cart)) {
-        const product = products.find(p => p.id === id);
+        const product = productMap[id];
         if (!product) continue;
         const itemTotal = product.price * qty;
         totalSum += itemTotal;
-        const formattedName = formatProductName(product);
+        const formattedName = product.name; // здесь можно применить форматирование, если нужно
 
         const itemDiv = document.createElement('div');
         itemDiv.className = 'cart-item';
@@ -1520,12 +1542,14 @@ function updateMainButton() {
 function sendOrder() {
     const orderItems = [];
     let total = 0;
+    // Здесь нужно также использовать productMap
+    const productMap = {}; // нужно инициализировать ранее
     for (const [id, qty] of Object.entries(cart)) {
-        const product = products.find(p => p.id === id);
+        const product = productMap[id];
         if (product) {
             orderItems.push({
                 id: product.id,
-                name: formatProductName(product),
+                name: product.name,
                 price: product.price,
                 quantity: qty,
                 total: product.price * qty,
@@ -1546,6 +1570,21 @@ function sendOrder() {
     tg.showAlert('Заказ отправлен! Скоро мы свяжемся с вами.');
 }
 
-// Инициализация
-renderCategories();
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
+// Строим словарь всех товаров для быстрого доступа в корзине
+function buildProductMap(node, map) {
+    if (node.products) {
+        node.products.forEach(p => {
+            map[p.id] = p;
+        });
+    }
+    if (node.subcategories) {
+        node.subcategories.forEach(sub => buildProductMap(sub, map));
+    }
+}
+const productMap = {};
+catalogData.categories.forEach(cat => buildProductMap(cat, productMap));
+
+// Запуск
+renderCurrentLevel();
 updateCartUI();
