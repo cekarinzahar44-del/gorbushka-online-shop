@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Горбушка Онлайн</title>
+    
+    <!-- Мета-теги для отключения кэширования -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Подключение стилей (версия 5) -->
+    <link rel="stylesheet" href="style-v5.css?v=20250313-003">
+    
+    <!-- Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <header>
+        <h1 class="gradient-text">📱 Горбушка Онлайн</h1>
+        <p id="user-greeting"></p>
+    </header>
+
+    <!-- Вкладки -->
+    <div class="tabs">
+        <button class="tab-button active" data-tab="catalog">Каталог</button>
+        <button class="tab-button" data-tab="cart">Корзина</button>
+        <button class="tab-button" data-tab="profile">Профиль</button>
+        <button class="tab-button" data-tab="ai">ИИ-чат</button>
+    </div>
+
+    <main>
+        <!-- Вкладка Каталог -->
+        <div id="catalog-tab" class="tab-content active">
+            <button id="back-to-categories" class="back-btn" style="display: none;">← Назад</button>
+            <div id="catalog-content"></div>
+        </div>
+
+        <!-- Вкладка Корзина -->
+        <div id="cart-tab" class="tab-content">
+            <section class="cart-section">
+                <h2>Корзина <span id="cart-count" class="cart-count pulse">0</span></h2>
+                <div id="cart-items"></div>
+                <div id="cart-total" class="cart-total"></div>
+            </section>
+        </div>
+
+        <!-- Вкладка Профиль -->
+        <div id="profile-tab" class="tab-content">
+            <div class="placeholder">👤 Здесь будет ваш профиль</div>
+        </div>
+
+        <!-- Вкладка ИИ-чат -->
+        <div id="ai-tab" class="tab-content">
+            <div class="placeholder">🤖 Здесь будет чат с ИИ</div>
+        </div>
+    </main>
+
+    <!-- Подключение скрипта (версия 5) -->
+    <script src="script-v5.js?v=20250313-003"></script>
+</body>
+</html>
