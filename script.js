@@ -1357,6 +1357,12 @@ function updateCartUI() {
     const totalItems = Object.values(cart).reduce((acc, qty) => acc + qty, 0);
     cartCountSpan.innerText = totalItems;
 
+    // Анимация пульсации счётчика
+    cartCountSpan.classList.add('pulse');
+    setTimeout(() => {
+        cartCountSpan.classList.remove('pulse');
+    }, 300);
+
     cartItemsContainer.innerHTML = '';
     if (totalItems === 0) {
         cartItemsContainer.innerHTML = '<div class="empty-cart">Корзина пуста</div>';
