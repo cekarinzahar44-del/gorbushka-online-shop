@@ -8,9 +8,8 @@ if (user) {
     document.getElementById('user-greeting').innerText = `Привет, ${user.first_name}!`;
 }
 
+// ================== ВАШ ПОЛНЫЙ КАТАЛОГ ==================
 const catalogData = {
-  "categories": [
-   {
   "categories": [
     {
       "id": "phones",
@@ -1247,13 +1246,10 @@ const catalogData = {
       ]
     }
   ]
-}
-
-
-  ]
 };
+// ================== КОНЕЦ КАТАЛОГА ==================
 
-// Рекурсивный сбор всех товаров с ценой > 0
+// Функция рекурсивного сбора товаров (с эмодзи)
 function extractAllProducts(data) {
     let products = [];
 
@@ -1288,11 +1284,9 @@ function extractAllProducts(data) {
         }
     }
 
-    // Начинаем с каждой корневой категории
     if (data.categories) {
         data.categories.forEach(cat => traverse(cat));
     }
-
     return products;
 }
 
