@@ -3,34 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Техно Маркет</title>
-    <!-- Добавлен параметр v=2 для принудительного обновления кэша -->
-    <link rel="stylesheet" href="style.css?v=2">
+    <title>Горбушка Онлайн</title>
+    <link rel="stylesheet" href="style-v3.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <header>
-        <!-- Градиентный заголовок -->
-        <h1 class="gradient-text">📱 Техно Маркет</h1>
+        <h1 class="gradient-text">📱 Горбушка Онлайн</h1>
         <p id="user-greeting"></p>
     </header>
 
-    <main>
-        <section class="catalog">
-            <h2>Каталог</h2>
-            <div id="products-container" class="products-grid">
-                <div class="loading">Загрузка товаров...</div>
-            </div>
-        </section>
+    <!-- Вкладки -->
+    <div class="tabs">
+        <button class="tab-button active" data-tab="catalog">Каталог</button>
+        <button class="tab-button" data-tab="cart">Корзина</button>
+        <button class="tab-button" data-tab="profile">Профиль</button>
+        <button class="tab-button" data-tab="ai">ИИ-чат</button>
+    </div>
 
-        <section class="cart-section">
-            <h2>Корзина <span id="cart-count" class="cart-count pulse">0</span></h2>
-            <div id="cart-items"></div>
-            <div id="cart-total" class="cart-total"></div>
-        </section>
+    <!-- Контент вкладок -->
+    <main>
+        <!-- Вкладка Каталог -->
+        <div id="catalog-tab" class="tab-content active">
+            <!-- Кнопка назад (появляется внутри категории) -->
+            <button id="back-to-categories" class="back-btn" style="display: none;">← Назад</button>
+            <!-- Контейнер для категорий или товаров -->
+            <div id="catalog-content"></div>
+        </div>
+
+        <!-- Вкладка Корзина -->
+        <div id="cart-tab" class="tab-content">
+            <section class="cart-section">
+                <h2>Корзина <span id="cart-count" class="cart-count pulse">0</span></h2>
+                <div id="cart-items"></div>
+                <div id="cart-total" class="cart-total"></div>
+            </section>
+        </div>
+
+        <!-- Вкладка Профиль (заглушка) -->
+        <div id="profile-tab" class="tab-content">
+            <div class="placeholder">👤 Здесь будет ваш профиль</div>
+        </div>
+
+        <!-- Вкладка ИИ-чат (заглушка) -->
+        <div id="ai-tab" class="tab-content">
+            <div class="placeholder">🤖 Здесь будет чат с ИИ</div>
+        </div>
     </main>
 
-    <!-- Добавлен параметр v=2 для скрипта -->
-    <script src="script.js?v=2"></script>
+    <script src="script-v3.js"></script>
 </body>
 </html>
