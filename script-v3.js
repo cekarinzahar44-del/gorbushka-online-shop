@@ -4,8 +4,11 @@ tg.ready();
 tg.expand();
 
 const user = tg.initDataUnsafe?.user;
+const greetingEl = document.getElementById('user-greeting');
 if (user) {
-    document.getElementById('user-greeting').innerText = `Привет, ${user.first_name}!`;
+    greetingEl.innerText = `Добро пожаловать, ${user.first_name}!`;
+} else {
+    greetingEl.innerText = `Добро пожаловать!`;
 }
 
 // ================== ВАШ ПОЛНЫЙ КАТАЛОГ ==================
@@ -1249,30 +1252,38 @@ const catalogData = {
 };
 // ================== КОНЕЦ КАТАЛОГА ==================
 
-// Функция рекурсивного сбора товаров (с эмодзи)
+// Функция рекурсивного сбора товаров с сохранением родительской категории
 function extractAllProducts(data) {
     let products = [];
 
-    function traverse(node, inheritedEmoji = '📦') {
-        // Определяем эмодзи для текущего узла
-        let currentEmoji = inheritedEmoji;
-        if (node.name) {
-            const emojiMatch = node.name.match(/^(\p{Emoji}+)/u);
-            if (emojiMatch) {
-                currentEmoji = emojiMatch[1];
-            }
+    function traverse(node, categoryId, categoryName) {
+        let currentCategoryId = categoryId;
+        let currentCategoryName = categoryName;
+
+        // Если узел сам является категорией, обновляем текущую категорию
+        if (node.id && node.name) {
+            currentCategoryId = node.id;
+            currentCategoryName = node.name;
         }
 
         // Если есть товары, добавляем их
         if (node.products && Array.isArray(node.products)) {
             node.products.forEach(item => {
                 if (item.price && item.price > 0) {
+                    // Определяем эмодзи из названия категории
+                    let emoji = '📦';
+                    const emojiMatch = currentCategoryName.match(/^(\p{Emoji}+)/u);
+                    if (emojiMatch) {
+                        emoji = emojiMatch[1];
+                    }
                     products.push({
                         id: item.id,
                         name: item.name,
                         price: item.price,
                         description: item.description || '',
-                        emoji: currentEmoji
+                        categoryId: currentCategoryId,
+                        categoryName: currentCategoryName,
+                        emoji: emoji
                     });
                 }
             });
@@ -1280,12 +1291,12 @@ function extractAllProducts(data) {
 
         // Рекурсивно обходим подкатегории
         if (node.subcategories && Array.isArray(node.subcategories)) {
-            node.subcategories.forEach(sub => traverse(sub, currentEmoji));
+            node.subcategories.forEach(sub => traverse(sub, currentCategoryId, currentCategoryName));
         }
     }
 
     if (data.categories) {
-        data.categories.forEach(cat => traverse(cat));
+        data.categories.forEach(cat => traverse(cat, cat.id, cat.name));
     }
     return products;
 }
@@ -1293,23 +1304,91 @@ function extractAllProducts(data) {
 const products = extractAllProducts(catalogData);
 console.log(`Загружено товаров: ${products.length}`);
 
-if (products.length === 0) {
-    document.getElementById('products-container').innerHTML = '<div class="empty-cart">Нет доступных товаров</div>';
-}
+// Получаем список уникальных категорий (первого уровня)
+const categories = catalogData.categories.map(cat => ({
+    id: cat.id,
+    name: cat.name,
+    emoji: cat.name.match(/^(\p{Emoji}+)/u)?.[1] || '📦'
+}));
 
-// Корзина
+// Состояние
 let cart = {};
+let currentCategoryId = null; // null = показываем категории, иначе показываем товары категории
 
 // Элементы DOM
-const productsContainer = document.getElementById('products-container');
+const catalogContent = document.getElementById('catalog-content');
+const backBtn = document.getElementById('back-to-categories');
 const cartItemsContainer = document.getElementById('cart-items');
 const cartTotalSpan = document.getElementById('cart-total');
 const cartCountSpan = document.getElementById('cart-count');
+const tabs = document.querySelectorAll('.tab-button');
+const tabContents = document.querySelectorAll('.tab-content');
 
-// Рендер каталога
-function renderProducts() {
-    productsContainer.innerHTML = '';
-    products.forEach(product => {
+// Переключение вкладок
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        const tabId = tab.dataset.tab;
+        // Деактивируем все вкладки
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        // Активируем выбранную
+        tab.classList.add('active');
+        document.getElementById(`${tabId}-tab`).classList.add('active');
+
+        // Если перешли на вкладку каталога, показываем категории или товары в зависимости от currentCategoryId
+        if (tabId === 'catalog') {
+            if (currentCategoryId) {
+                showCategoryProducts(currentCategoryId, true);
+            } else {
+                renderCategories();
+            }
+        }
+    });
+});
+
+// Рендер категорий
+function renderCategories() {
+    backBtn.style.display = 'none';
+    catalogContent.innerHTML = '<div class="categories-grid"></div>';
+    const grid = catalogContent.querySelector('.categories-grid');
+
+    categories.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'category-card';
+        card.dataset.categoryId = cat.id;
+        card.innerHTML = `
+            <div class="category-emoji">${cat.emoji}</div>
+            <div class="category-name">${cat.name.replace(/^\p{Emoji}+/u, '').trim()}</div>
+        `;
+        card.addEventListener('click', () => {
+            currentCategoryId = cat.id;
+            showCategoryProducts(cat.id);
+        });
+        grid.appendChild(card);
+    });
+}
+
+// Показать товары категории
+function showCategoryProducts(categoryId, skipHistory = false) {
+    if (!skipHistory) {
+        currentCategoryId = categoryId;
+    }
+    backBtn.style.display = 'inline-block';
+    const filtered = products.filter(p => p.categoryId === categoryId);
+    renderProducts(filtered);
+}
+
+// Рендер товаров (принимает массив)
+function renderProducts(productsToRender) {
+    catalogContent.innerHTML = '';
+    if (productsToRender.length === 0) {
+        catalogContent.innerHTML = '<div class="empty-cart">Нет товаров в этой категории</div>';
+        return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'products-grid';
+    productsToRender.forEach(product => {
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
@@ -1319,9 +1398,11 @@ function renderProducts() {
             ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
             <button class="add-to-cart-btn" data-id="${product.id}">В корзину</button>
         `;
-        productsContainer.appendChild(card);
+        grid.appendChild(card);
     });
+    catalogContent.appendChild(grid);
 
+    // Обработчики кнопок "В корзину"
     document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             addToCart(e.target.dataset.id);
@@ -1329,6 +1410,13 @@ function renderProducts() {
     });
 }
 
+// Назад к категориям
+backBtn.addEventListener('click', () => {
+    currentCategoryId = null;
+    renderCategories();
+});
+
+// Функции корзины
 function addToCart(productId) {
     cart[productId] = (cart[productId] || 0) + 1;
     updateCartUI();
@@ -1356,12 +1444,8 @@ function changeQuantity(productId, delta) {
 function updateCartUI() {
     const totalItems = Object.values(cart).reduce((acc, qty) => acc + qty, 0);
     cartCountSpan.innerText = totalItems;
-
-    // Анимация пульсации счётчика
     cartCountSpan.classList.add('pulse');
-    setTimeout(() => {
-        cartCountSpan.classList.remove('pulse');
-    }, 300);
+    setTimeout(() => cartCountSpan.classList.remove('pulse'), 300);
 
     cartItemsContainer.innerHTML = '';
     if (totalItems === 0) {
@@ -1449,5 +1533,6 @@ function sendOrder() {
     tg.showAlert('Заказ отправлен! Скоро мы свяжемся с вами.');
 }
 
-// Запуск
-renderProducts();
+// Инициализация
+renderCategories();
+updateCartUI(); // показать пустую корзину
