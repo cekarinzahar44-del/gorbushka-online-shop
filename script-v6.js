@@ -1252,30 +1252,42 @@ const catalogData = {
 };
 // ================== КОНЕЦ КАТАЛОГА ==================
 
-// ========== НОВАЯ ЛОГИКА МНОГОУРОВНЕВОЙ НАВИГАЦИИ ==========
+// ---------- Построение productMap для корзины ----------
+const productMap = {};
 
-// Стек навигации: хранит путь к текущему узлу (массив объектов с id, name, emoji, type)
-let navStack = [];
+function buildProductMap(node) {
+    if (node.products) {
+        node.products.forEach(p => {
+            productMap[p.id] = p;
+        });
+    }
+    if (node.subcategories) {
+        node.subcategories.forEach(sub => buildProductMap(sub));
+    }
+}
 
-// Текущий отображаемый узел (объект, который мы рендерим)
-let currentNode = null;
+catalogData.categories.forEach(cat => buildProductMap(cat));
+console.log(`Загружено товаров в productMap: ${Object.keys(productMap).length}`);
 
-// Функция для извлечения всех категорий верхнего уровня
+// ---------- Навигация по категориям ----------
+let navStack = [];          // стек для кнопки назад
+let currentNode = null;     // текущий узел (корневая категория или подкатегория)
+
+// Получить корневые категории
 function getRootCategories() {
     return catalogData.categories.map(cat => ({
         id: cat.id,
         name: cat.name,
         emoji: cat.name.match(/^(\p{Emoji}+)/u)?.[1] || '📦',
         type: 'category',
-        node: cat // ссылка на оригинальный узел
+        node: cat
     }));
 }
 
-// Функция для получения дочерних элементов узла (подкатегории или товары)
+// Получить дочерние элементы узла (подкатегории или товары)
 function getChildren(node) {
     if (!node) return [];
-
-    // Если узел имеет подкатегории, возвращаем их
+    // Если есть подкатегории, возвращаем их
     if (node.subcategories && node.subcategories.length > 0) {
         return node.subcategories.map(sub => ({
             id: sub.id,
@@ -1285,8 +1297,7 @@ function getChildren(node) {
             node: sub
         }));
     }
-
-    // Если узел имеет товары, возвращаем товары
+    // Если есть товары, возвращаем их
     if (node.products && node.products.length > 0) {
         return node.products.map(product => ({
             id: product.id,
@@ -1297,53 +1308,32 @@ function getChildren(node) {
             node: product
         }));
     }
-
     return [];
 }
 
-// Функция для получения названия элемента с учётом форматирования (для товаров)
-function getDisplayName(item) {
-    if (item.type === 'product') {
-        // Пытаемся отформатировать название для телефонов
-        if (currentNode && currentNode.categoryId === 'phones') { // если мы внутри категории Телефоны
-            return formatPhoneName(item.name);
-        }
-        return item.name;
-    }
-    return item.name;
+// Форматирование названия товара (можно доработать под свои нужды)
+function formatProductName(product) {
+    // Если нужно, добавьте логику для телефонов и т.д.
+    return product.name;
 }
 
-// Форматирование названия телефона (пример)
-function formatPhoneName(originalName) {
-    // Убираем лишние символы, флаги, скобки
-    let clean = originalName.replace(/\s*\([^)]*\)/g, '').replace(/🇺🇸|🇯🇵|🇨🇳|🇰🇷|🇸🇬|🇦🇪|🇲🇾|🇮🇳|🇵🇦|🇰🇿/g, '').trim();
-    // Пытаемся разбить на модель, память, цвет (упрощённо)
-    const parts = clean.split(' ');
-    if (parts.length >= 3) {
-        const model = parts[0] + ' ' + parts[1]; // например "iPhone 17" или "A06"
-        const memory = parts[2]; // например "256"
-        const color = parts.slice(3).join(' ') || '';
-        return `${model}, ${memory}GB, ${color}`.replace(/, $/, '');
-    }
-    return clean;
-}
-
-// Рендер текущего уровня (категории или товары)
+// Рендер текущего уровня
 function renderCurrentLevel() {
+    const catalogContent = document.getElementById('catalog-content');
+    const backBtn = document.getElementById('back-to-categories');
+
     if (!currentNode) {
-        // Начальный уровень – корневые категории
+        // Корневой уровень: показываем категории
         const rootItems = getRootCategories();
         renderItems(rootItems, 'Категории');
         backBtn.style.display = 'none';
     } else {
         const children = getChildren(currentNode.node);
         if (children.length > 0) {
-            // Если есть дочерние элементы – показываем их
             renderItems(children, currentNode.name);
             backBtn.style.display = 'inline-block';
         } else {
-            // Если нет дочерних – это лист (например, категория без товаров) – просто показываем заглушку
-            catalogContent.innerHTML = '<div class="empty-cart">Нет товаров</div>';
+            catalogContent.innerHTML = '<div class="empty-cart">Нет товаров в этой категории</div>';
             backBtn.style.display = 'inline-block';
         }
     }
@@ -1351,17 +1341,17 @@ function renderCurrentLevel() {
 
 // Рендер списка элементов (категорий или товаров)
 function renderItems(items, title) {
+    const catalogContent = document.getElementById('catalog-content');
     catalogContent.innerHTML = '';
+
     if (items.length === 0) {
         catalogContent.innerHTML = '<div class="empty-cart">Нет элементов</div>';
         return;
     }
 
-    // Определяем, являются ли элементы товарами (по наличию поля price)
     const isProducts = items[0].type === 'product';
 
     if (isProducts) {
-        // Отображаем как сетку товаров
         const grid = document.createElement('div');
         grid.className = 'products-grid';
         items.forEach(item => {
@@ -1369,7 +1359,7 @@ function renderItems(items, title) {
             card.className = 'product-card';
             card.innerHTML = `
                 <div class="product-emoji">${item.emoji || '📦'}</div>
-                <div class="product-name">${getDisplayName(item)}</div>
+                <div class="product-name">${formatProductName(item.node)}</div>
                 <div class="product-price">${item.price.toLocaleString()} ₽</div>
                 ${item.description ? `<div class="product-description">${item.description}</div>` : ''}
                 <button class="add-to-cart-btn" data-id="${item.id}">В корзину</button>
@@ -1378,14 +1368,12 @@ function renderItems(items, title) {
         });
         catalogContent.appendChild(grid);
 
-        // Обработчики кнопок "В корзину"
         document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 addToCart(e.target.dataset.id);
             });
         });
     } else {
-        // Отображаем как сетку категорий
         const grid = document.createElement('div');
         grid.className = 'categories-grid';
         items.forEach(item => {
@@ -1397,7 +1385,6 @@ function renderItems(items, title) {
                 <div class="category-name">${item.name}</div>
             `;
             card.addEventListener('click', () => {
-                // Переход внутрь выбранной категории
                 navStack.push(currentNode);
                 currentNode = item;
                 renderCurrentLevel();
@@ -1408,17 +1395,7 @@ function renderItems(items, title) {
     }
 }
 
-// Кнопка "Назад"
-backBtn.addEventListener('click', () => {
-    if (navStack.length > 0) {
-        currentNode = navStack.pop();
-    } else {
-        currentNode = null;
-    }
-    renderCurrentLevel();
-});
-
-// ========== КОРЗИНА (без изменений) ==========
+// ---------- Корзина ----------
 let cart = {};
 
 const cartItemsContainer = document.getElementById('cart-items');
@@ -1436,7 +1413,7 @@ tabs.forEach(tab => {
         tab.classList.add('active');
         document.getElementById(`${tabId}-tab`).classList.add('active');
 
-        // Если перешли на вкладку каталога, сбрасываем навигацию на корень
+        // При переходе на каталог сбрасываем навигацию
         if (tabId === 'catalog') {
             navStack = [];
             currentNode = null;
@@ -1483,24 +1460,17 @@ function updateCartUI() {
     }
 
     let totalSum = 0;
-    // Для корзины нам нужен доступ к товарам. Можно сделать глобальный массив всех товаров,
-    // но для простоты воспользуемся рекурсивным сбором (можно вынести, но пока оставим как есть)
-    // ВАЖНО: для работы корзины нужен быстрый доступ к товарам по id. Создадим словарь.
-    const productMap = {};
-    // Заполним productMap при инициализации (в самом низу)
-
     for (const [id, qty] of Object.entries(cart)) {
         const product = productMap[id];
         if (!product) continue;
         const itemTotal = product.price * qty;
         totalSum += itemTotal;
-        const formattedName = product.name; // здесь можно применить форматирование, если нужно
 
         const itemDiv = document.createElement('div');
         itemDiv.className = 'cart-item';
         itemDiv.innerHTML = `
             <div class="cart-item-info">
-                <div>${formattedName}</div>
+                <div>${formatProductName(product)}</div>
                 <div class="cart-item-price">${product.price.toLocaleString()} ₽</div>
                 ${product.description ? `<div style="font-size: 11px; color: var(--hint-color);">${product.description}</div>` : ''}
             </div>
@@ -1542,14 +1512,12 @@ function updateMainButton() {
 function sendOrder() {
     const orderItems = [];
     let total = 0;
-    // Здесь нужно также использовать productMap
-    const productMap = {}; // нужно инициализировать ранее
     for (const [id, qty] of Object.entries(cart)) {
         const product = productMap[id];
         if (product) {
             orderItems.push({
                 id: product.id,
-                name: product.name,
+                name: formatProductName(product),
                 price: product.price,
                 quantity: qty,
                 total: product.price * qty,
@@ -1570,21 +1538,6 @@ function sendOrder() {
     tg.showAlert('Заказ отправлен! Скоро мы свяжемся с вами.');
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
-// Строим словарь всех товаров для быстрого доступа в корзине
-function buildProductMap(node, map) {
-    if (node.products) {
-        node.products.forEach(p => {
-            map[p.id] = p;
-        });
-    }
-    if (node.subcategories) {
-        node.subcategories.forEach(sub => buildProductMap(sub, map));
-    }
-}
-const productMap = {};
-catalogData.categories.forEach(cat => buildProductMap(cat, productMap));
-
-// Запуск
+// Инициализация
 renderCurrentLevel();
 updateCartUI();
