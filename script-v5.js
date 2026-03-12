@@ -1257,41 +1257,35 @@ function extractAllProducts(data) {
     let products = [];
 
     function traverse(node, categoryId, categoryName) {
-        let currentCategoryId = categoryId;
-        let currentCategoryName = categoryName;
-
-        // Если узел сам является категорией, обновляем текущую категорию
-        if (node.id && node.name) {
-            currentCategoryId = node.id;
-            currentCategoryName = node.name;
-        }
-
         // Если есть товары, добавляем их
         if (node.products && Array.isArray(node.products)) {
             node.products.forEach(item => {
-                if (item.price && item.price > 0) {
-                    // Определяем эмодзи из названия категории
-                    let emoji = '📦';
-                    const emojiMatch = currentCategoryName.match(/^(\p{Emoji}+)/u);
-                    if (emojiMatch) {
-                        emoji = emojiMatch[1];
-                    }
-                    products.push({
-                        id: item.id,
-                        name: item.name,
-                        price: item.price,
-                        description: item.description || '',
-                        categoryId: currentCategoryId,
-                        categoryName: currentCategoryName,
-                        emoji: emoji
-                    });
+                // Преобразуем цену в число (если строка)
+                let price = parseFloat(item.price);
+                if (isNaN(price)) price = 0;
+
+                // Определяем эмодзи из названия категории
+                let emoji = '📦';
+                const emojiMatch = categoryName.match(/^(\p{Emoji}+)/u);
+                if (emojiMatch) {
+                    emoji = emojiMatch[1];
                 }
+
+                products.push({
+                    id: item.id,
+                    name: item.name,
+                    price: price,
+                    description: item.description || '',
+                    categoryId: categoryId,
+                    categoryName: categoryName,
+                    emoji: emoji
+                });
             });
         }
 
         // Рекурсивно обходим подкатегории
         if (node.subcategories && Array.isArray(node.subcategories)) {
-            node.subcategories.forEach(sub => traverse(sub, currentCategoryId, currentCategoryName));
+            node.subcategories.forEach(sub => traverse(sub, categoryId, categoryName));
         }
     }
 
@@ -1303,6 +1297,27 @@ function extractAllProducts(data) {
 
 const products = extractAllProducts(catalogData);
 console.log(`Загружено товаров: ${products.length}`);
+
+// Функция форматирования названия товара
+function formatProductName(product) {
+    // Для телефонов iPhone пытаемся привести к формату "Модель, память, цвет"
+    if (product.categoryId === 'phones' && product.name.includes('iPhone')) {
+        // Пример: "17 Pro 256 Orange 🇺🇸 (e sim актив)" -> "iPhone 17 Pro, 256GB, Orange"
+        let name = product.name;
+        // Удаляем лишнее в скобках и флаги
+        name = name.replace(/\s*\([^)]*\)/g, '').replace(/🇺🇸|🇯🇵|🇨🇳|🇰🇷|🇸🇬|🇦🇪|🇲🇾|🇮🇳|🇵🇦/g, '').trim();
+        // Разбиваем на части
+        const parts = name.split(' ');
+        if (parts.length >= 3) {
+            const model = parts[0] + ' ' + parts[1]; // например "17 Pro"
+            const memory = parts[2]; // например "256"
+            const color = parts.slice(3).join(' ') || '';
+            return `iPhone ${model}, ${memory}GB, ${color}`.replace(/, $/, '');
+        }
+    }
+    // Для остальных товаров возвращаем исходное название
+    return product.name;
+}
 
 // Получаем список уникальных категорий (первого уровня)
 const categories = catalogData.categories.map(cat => ({
@@ -1328,14 +1343,11 @@ const tabContents = document.querySelectorAll('.tab-content');
 tabs.forEach(tab => {
     tab.addEventListener('click', () => {
         const tabId = tab.dataset.tab;
-        // Деактивируем все вкладки
         tabs.forEach(t => t.classList.remove('active'));
         tabContents.forEach(c => c.classList.remove('active'));
-        // Активируем выбранную
         tab.classList.add('active');
         document.getElementById(`${tabId}-tab`).classList.add('active');
 
-        // Если перешли на вкладку каталога, показываем категории или товары в зависимости от currentCategoryId
         if (tabId === 'catalog') {
             if (currentCategoryId) {
                 showCategoryProducts(currentCategoryId, true);
@@ -1374,11 +1386,11 @@ function showCategoryProducts(categoryId, skipHistory = false) {
         currentCategoryId = categoryId;
     }
     backBtn.style.display = 'inline-block';
-    const filtered = products.filter(p => p.categoryId === categoryId);
+    const filtered = products.filter(p => p.categoryId === categoryId && p.price > 0); // показываем только товары с ценой > 0
     renderProducts(filtered);
 }
 
-// Рендер товаров (принимает массив)
+// Рендер товаров
 function renderProducts(productsToRender) {
     catalogContent.innerHTML = '';
     if (productsToRender.length === 0) {
@@ -1389,11 +1401,12 @@ function renderProducts(productsToRender) {
     const grid = document.createElement('div');
     grid.className = 'products-grid';
     productsToRender.forEach(product => {
+        const formattedName = formatProductName(product);
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
             <div class="product-emoji">${product.emoji}</div>
-            <div class="product-name">${product.name}</div>
+            <div class="product-name">${formattedName}</div>
             <div class="product-price">${product.price.toLocaleString()} ₽</div>
             ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
             <button class="add-to-cart-btn" data-id="${product.id}">В корзину</button>
@@ -1402,7 +1415,6 @@ function renderProducts(productsToRender) {
     });
     catalogContent.appendChild(grid);
 
-    // Обработчики кнопок "В корзину"
     document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             addToCart(e.target.dataset.id);
@@ -1416,7 +1428,7 @@ backBtn.addEventListener('click', () => {
     renderCategories();
 });
 
-// Функции корзины
+// Функции корзины (без изменений)
 function addToCart(productId) {
     cart[productId] = (cart[productId] || 0) + 1;
     updateCartUI();
@@ -1460,12 +1472,13 @@ function updateCartUI() {
         if (!product) continue;
         const itemTotal = product.price * qty;
         totalSum += itemTotal;
+        const formattedName = formatProductName(product);
 
         const itemDiv = document.createElement('div');
         itemDiv.className = 'cart-item';
         itemDiv.innerHTML = `
             <div class="cart-item-info">
-                <div>${product.name}</div>
+                <div>${formattedName}</div>
                 <div class="cart-item-price">${product.price.toLocaleString()} ₽</div>
                 ${product.description ? `<div style="font-size: 11px; color: var(--hint-color);">${product.description}</div>` : ''}
             </div>
@@ -1512,7 +1525,7 @@ function sendOrder() {
         if (product) {
             orderItems.push({
                 id: product.id,
-                name: product.name,
+                name: formatProductName(product),
                 price: product.price,
                 quantity: qty,
                 total: product.price * qty,
@@ -1535,4 +1548,4 @@ function sendOrder() {
 
 // Инициализация
 renderCategories();
-updateCartUI(); // показать пустую корзину
+updateCartUI();
