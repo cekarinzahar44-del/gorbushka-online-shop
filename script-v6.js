@@ -1262,12 +1262,10 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     // ================== КОНЕЦ КАТАЛОГА ==================
 
-    // ---------- ПРОСТОЙ ПОИСК ----------
-    
-    // Собираем все товары в один массив
+    // ---------- СОЗДАЕМ ПЛОСКИЙ СПИСОК ВСЕХ ТОВАРОВ ----------
     const allProducts = [];
     
-    function collectProducts(node) {
+    function collectAllProducts(node) {
         if (node.products) {
             node.products.forEach(p => {
                 allProducts.push({
@@ -1281,19 +1279,19 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         if (node.subcategories) {
-            node.subcategories.forEach(sub => collectProducts(sub));
+            node.subcategories.forEach(sub => collectAllProducts(sub));
         }
     }
     
-    catalogData.categories.forEach(cat => collectProducts(cat));
+    catalogData.categories.forEach(cat => collectAllProducts(cat));
     console.log(`Всего товаров: ${allProducts.length}`);
 
-    // ---------- Навигация по категориям ----------
+    // ---------- НАВИГАЦИЯ ПО КАТЕГОРИЯМ ----------
     let navStack = [];
     let currentNode = null;
-    let searchActive = false;
+    let searchMode = false;
 
-    // Получить корневые категории
+    // Функция для получения корневых категорий
     function getRootCategories() {
         return catalogData.categories.map(cat => ({
             id: cat.id,
@@ -1303,9 +1301,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
     }
 
-    // Получить дочерние элементы
+    // Функция для получения дочерних элементов
     function getChildren(node) {
         if (!node) return [];
+        
+        // Если есть подкатегории, показываем их
         if (node.subcategories && node.subcategories.length > 0) {
             return node.subcategories.map(sub => ({
                 id: sub.id,
@@ -1314,6 +1314,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 node: sub
             }));
         }
+        
+        // Если есть товары, показываем их
         if (node.products && node.products.length > 0) {
             return node.products.map(product => ({
                 id: product.id,
@@ -1324,37 +1326,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 node: product
             }));
         }
+        
         return [];
     }
 
-    // Рендер текущего уровня
-    function renderCurrentLevel() {
-        const catalogContent = document.getElementById('catalog-content');
-        const backBtn = document.getElementById('back-to-categories');
-
-        if (!catalogContent) return;
-
-        if (searchActive) {
-            return; // Поиск управляется отдельно
-        }
-
-        if (!currentNode) {
-            const rootItems = getRootCategories();
-            renderItems(rootItems);
-            if (backBtn) backBtn.style.display = 'none';
-        } else {
-            const children = getChildren(currentNode.node);
-            if (children.length > 0) {
-                renderItems(children);
-                if (backBtn) backBtn.style.display = 'inline-block';
-            } else {
-                catalogContent.innerHTML = '<div class="empty-cart">Нет товаров</div>';
-                if (backBtn) backBtn.style.display = 'inline-block';
-            }
-        }
-    }
-
-    // Рендер элементов
+    // Функция для отображения элементов
     function renderItems(items) {
         const catalogContent = document.getElementById('catalog-content');
         if (!catalogContent) return;
@@ -1362,13 +1338,14 @@ document.addEventListener('DOMContentLoaded', function() {
         catalogContent.innerHTML = '';
 
         if (items.length === 0) {
-            catalogContent.innerHTML = '<div class="empty-cart">Пусто</div>';
+            catalogContent.innerHTML = '<div class="empty-cart">Нет товаров</div>';
             return;
         }
 
         const isProducts = items[0].type === 'product';
 
         if (isProducts) {
+            // Показываем товары
             const grid = document.createElement('div');
             grid.className = 'products-grid';
             items.forEach(item => {
@@ -1384,20 +1361,22 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             catalogContent.appendChild(grid);
 
+            // Добавляем обработчики для кнопок
             document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     addToCart(e.target.dataset.id);
                 });
             });
         } else {
+            // Показываем категории
             const grid = document.createElement('div');
             grid.className = 'categories-grid';
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'category-card';
-                card.dataset.id = item.id;
                 card.innerHTML = `<div class="category-name">${item.name}</div>`;
                 card.addEventListener('click', () => {
+                    // Сохраняем текущий узел в стек и переходим в выбранную категорию
                     navStack.push(currentNode);
                     currentNode = item;
                     renderCurrentLevel();
@@ -1408,16 +1387,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ---------- ПРОСТОЙ ПОИСК ----------
+    // Функция для отображения текущего уровня
+    function renderCurrentLevel() {
+        const catalogContent = document.getElementById('catalog-content');
+        const backBtn = document.getElementById('back-to-categories');
+
+        if (!catalogContent) return;
+
+        // Если мы в режиме поиска, не меняем содержимое
+        if (searchMode) return;
+
+        if (!currentNode) {
+            // Корневой уровень - показываем все категории
+            const rootItems = getRootCategories();
+            renderItems(rootItems);
+            if (backBtn) backBtn.style.display = 'none';
+        } else {
+            // Показываем дочерние элементы текущего узла
+            const children = getChildren(currentNode.node);
+            if (children.length > 0) {
+                renderItems(children);
+                if (backBtn) backBtn.style.display = 'inline-block';
+            } else {
+                catalogContent.innerHTML = '<div class="empty-cart">Нет товаров</div>';
+                if (backBtn) backBtn.style.display = 'inline-block';
+            }
+        }
+    }
+
+    // ---------- ФУНКЦИИ ПОИСКА ----------
     function searchProducts(query) {
         if (!query || query.length < 2) return [];
         
-        query = query.toLowerCase().trim();
+        const searchTerm = query.toLowerCase().trim();
         
         return allProducts.filter(product => {
             // Простая проверка на вхождение подстроки
-            return product.nameLower.includes(query) || 
-                   product.descLower.includes(query);
+            return product.nameLower.includes(searchTerm) || 
+                   product.descLower.includes(searchTerm);
         });
     }
 
@@ -1458,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (backBtn) backBtn.style.display = 'inline-block';
     }
 
-    // ---------- Корзина ----------
+    // ---------- КОРЗИНА ----------
     let cart = {};
 
     try {
@@ -1468,68 +1475,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     } catch (e) {
         console.warn('Ошибка загрузки корзины');
-    }
-
-    const cartItemsContainer = document.getElementById('cart-items');
-    const cartTotalSpan = document.getElementById('cart-total');
-    const cartCountSpan = document.getElementById('cart-count');
-    const tabs = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const backBtn = document.getElementById('back-to-categories');
-    const searchInput = document.getElementById('search-input');
-
-    // Переключение вкладок
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabId = tab.dataset.tab;
-            tabs.forEach(t => t.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(`${tabId}-tab`).classList.add('active');
-
-            if (tabId === 'catalog') {
-                navStack = [];
-                currentNode = null;
-                searchActive = false;
-                if (searchInput) searchInput.value = '';
-                renderCurrentLevel();
-            }
-        });
-    });
-
-    // Кнопка назад
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            if (searchActive) {
-                searchActive = false;
-                if (searchInput) searchInput.value = '';
-                renderCurrentLevel();
-                return;
-            }
-            if (navStack.length > 0) {
-                currentNode = navStack.pop();
-            } else {
-                currentNode = null;
-            }
-            renderCurrentLevel();
-        });
-    }
-
-    // Поиск
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value;
-            if (query.length >= 2) {
-                searchActive = true;
-                const results = searchProducts(query);
-                showSearchResults(results);
-            } else {
-                if (searchActive) {
-                    searchActive = false;
-                    renderCurrentLevel();
-                }
-            }
-        });
     }
 
     // Функции корзины
@@ -1564,6 +1509,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateCartUI() {
+        const cartItemsContainer = document.getElementById('cart-items');
+        const cartTotalSpan = document.getElementById('cart-total');
+        const cartCountSpan = document.getElementById('cart-count');
+        
         const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
         
         if (cartCountSpan) {
@@ -1583,7 +1532,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalSum = 0;
 
         for (const [id, qty] of Object.entries(cart)) {
-            // Находим товар по id в allProducts
             const product = allProducts.find(p => p.id === id);
             if (!product) continue;
             
@@ -1595,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', function() {
             itemDiv.innerHTML = `
                 <div>
                     <div>${product.name}</div>
-                    <div>${product.price} ₽ x ${qty}</div>
+                    <div>${product.price.toLocaleString()} ₽ x ${qty}</div>
                 </div>
                 <div>
                     <button onclick="changeQuantity('${id}', -1)">-</button>
@@ -1611,6 +1559,72 @@ document.addEventListener('DOMContentLoaded', function() {
             cartTotalSpan.innerText = `Итого: ${totalSum.toLocaleString()} ₽`;
         }
     }
+
+    // ---------- ОБРАБОТЧИКИ СОБЫТИЙ ----------
+    const tabs = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const backBtn = document.getElementById('back-to-categories');
+    const searchInput = document.getElementById('search-input');
+
+    // Переключение вкладок
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabId = tab.dataset.tab;
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+
+            if (tabId === 'catalog') {
+                // Сбрасываем навигацию при переходе на каталог
+                navStack = [];
+                currentNode = null;
+                searchMode = false;
+                if (searchInput) searchInput.value = '';
+                renderCurrentLevel();
+            }
+        });
+    });
+
+    // Кнопка "Назад"
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            if (searchMode) {
+                // Если были в поиске, выходим из него
+                searchMode = false;
+                if (searchInput) searchInput.value = '';
+                renderCurrentLevel();
+                return;
+            }
+            if (navStack.length > 0) {
+                currentNode = navStack.pop();
+            } else {
+                currentNode = null;
+            }
+            renderCurrentLevel();
+        });
+    }
+
+    // Поиск
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            if (query.length >= 2) {
+                searchMode = true;
+                const results = searchProducts(query);
+                showSearchResults(results);
+            } else {
+                if (searchMode) {
+                    searchMode = false;
+                    renderCurrentLevel();
+                }
+            }
+        });
+    }
+
+    // Делаем функции корзины доступными глобально
+    window.changeQuantity = changeQuantity;
+    window.removeFromCart = removeFromCart;
 
     // Инициализация
     renderCurrentLevel();
