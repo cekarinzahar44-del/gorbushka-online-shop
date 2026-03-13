@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Горбушка Онлайн</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <header>
+        <h1>📱 Горбушка Онлайн</h1>
+        <p id="user-greeting"></p>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-button active" data-tab="catalog">Каталог</button>
+        <button class="tab-button" data-tab="cart">Корзина</button>
+        <button class="tab-button" data-tab="profile">Профиль</button>
+        <button class="tab-button" data-tab="ai">ИИ-чат</button>
+    </div>
+
+    <main>
+        <div id="catalog-tab" class="tab-content active">
+            <button id="back-btn" class="back-btn" style="display: none;">← Назад</button>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="🔍 Поиск...">
+            </div>
+            <div id="catalog-content"></div>
+        </div>
+
+        <div id="cart-tab" class="tab-content">
+            <h2>Корзина <span id="cart-count">0</span></h2>
+            <div id="cart-items"></div>
+            <div id="cart-total">Итого: 0 ₽</div>
+        </div>
+
+        <div id="profile-tab" class="tab-content">
+            <div class="placeholder">👤 Профиль</div>
+        </div>
+
+        <div id="ai-tab" class="tab-content">
+            <div class="placeholder">🤖 ИИ-чат</div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
