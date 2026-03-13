@@ -1262,6 +1262,30 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     // ================== КОНЕЦ КАТАЛОГА ==================
 
+    // ---------- Построение плоского списка всех товаров для поиска ----------
+    const allProducts = [];
+
+    function collectAllProducts(node) {
+        if (node.products) {
+            node.products.forEach(p => {
+                allProducts.push({
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    description: p.description || '',
+                    categoryName: node.name || 'Товары',
+                    emoji: extractEmoji(p.name)
+                });
+            });
+        }
+        if (node.subcategories) {
+            node.subcategories.forEach(sub => collectAllProducts(sub));
+        }
+    }
+
+    catalogData.categories.forEach(cat => collectAllProducts(cat));
+    console.log(`Всего товаров для поиска: ${allProducts.length}`);
+
     // ---------- Построение productMap для корзины ----------
     const productMap = {};
 
@@ -1277,13 +1301,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     catalogData.categories.forEach(cat => buildProductMap(cat));
-    console.log(`Загружено товаров в productMap: ${Object.keys(productMap).length}`);
 
     // ---------- Навигация по категориям ----------
     let navStack = [];
     let currentNode = null;
     let searchTerm = '';
-    let currentItems = [];
+    let isSearchActive = false;
 
     function extractEmoji(name) {
         if (!name) return '📦';
@@ -1331,11 +1354,87 @@ document.addEventListener('DOMContentLoaded', function() {
         return product.name;
     }
 
+    // Функция для нормализации текста (регистр + транслитерация)
+    function normalizeText(text) {
+        if (!text) return '';
+        const lower = text.toLowerCase();
+        // Простая транслитерация для русских букв
+        const translitMap = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+            'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        };
+        let translit = '';
+        for (let char of lower) {
+            if (translitMap[char]) {
+                translit += translitMap[char];
+            } else {
+                translit += char;
+            }
+        }
+        return translit;
+    }
+
+    function performSearch(term) {
+        if (!term || term.length < 2) return [];
+        const normalizedTerm = normalizeText(term);
+        return allProducts.filter(product => {
+            const normalizedName = normalizeText(product.name);
+            const normalizedDesc = normalizeText(product.description);
+            return normalizedName.includes(normalizedTerm) || normalizedDesc.includes(normalizedTerm);
+        });
+    }
+
+    function renderSearchResults(results) {
+        const catalogContent = document.getElementById('catalog-content');
+        const backBtn = document.getElementById('back-to-categories');
+        
+        if (!catalogContent) return;
+        
+        catalogContent.innerHTML = '';
+
+        if (results.length === 0) {
+            catalogContent.innerHTML = '<div class="empty-cart">Ничего не найдено</div>';
+            return;
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'products-grid';
+        results.forEach(product => {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="product-emoji">${product.emoji || '📦'}</div>
+                <div class="product-name">${product.name}</div>
+                <div class="product-price">${product.price.toLocaleString()} ₽</div>
+                ${product.description ? `<div class="product-description">${product.description}</div>` : ''}
+                <button class="add-to-cart-btn" data-id="${product.id}">В корзину</button>
+            `;
+            grid.appendChild(card);
+        });
+        catalogContent.appendChild(grid);
+
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                addToCart(e.target.dataset.id);
+            });
+        });
+        
+        if (backBtn) backBtn.style.display = 'inline-block';
+    }
+
     function renderCurrentLevel() {
         const catalogContent = document.getElementById('catalog-content');
         const backBtn = document.getElementById('back-to-categories');
 
         if (!catalogContent) return;
+
+        if (isSearchActive) {
+            // Уже в поиске, ничего не делаем
+            return;
+        }
 
         if (!currentNode) {
             const rootItems = getRootCategories();
@@ -1357,29 +1456,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const catalogContent = document.getElementById('catalog-content');
         if (!catalogContent) return;
 
-        currentItems = items;
-
-        let itemsToRender = items;
-        if (searchTerm && items.length > 0 && items[0].type === 'product') {
-            itemsToRender = items.filter(item => 
-                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-        }
-
         catalogContent.innerHTML = '';
 
-        if (itemsToRender.length === 0) {
-            catalogContent.innerHTML = '<div class="empty-cart">Ничего не найдено</div>';
+        if (items.length === 0) {
+            catalogContent.innerHTML = '<div class="empty-cart">Нет элементов</div>';
             return;
         }
 
-        const isProducts = itemsToRender[0].type === 'product';
+        const isProducts = items[0].type === 'product';
 
         if (isProducts) {
             const grid = document.createElement('div');
             grid.className = 'products-grid';
-            itemsToRender.forEach(item => {
+            items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 card.innerHTML = `
@@ -1401,7 +1490,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             const grid = document.createElement('div');
             grid.className = 'categories-grid';
-            itemsToRender.forEach(item => {
+            items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'category-card';
                 card.dataset.id = item.id;
@@ -1412,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.addEventListener('click', () => {
                     navStack.push(currentNode);
                     currentNode = item;
-                    searchTerm = '';
+                    isSearchActive = false;
                     const searchInput = document.getElementById('search-input');
                     if (searchInput) searchInput.value = '';
                     renderCurrentLevel();
@@ -1452,6 +1541,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tabId === 'catalog') {
                 navStack = [];
                 currentNode = null;
+                isSearchActive = false;
                 searchTerm = '';
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) searchInput.value = '';
@@ -1463,14 +1553,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const backBtn = document.getElementById('back-to-categories');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
+            if (isSearchActive) {
+                isSearchActive = false;
+                searchTerm = '';
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) searchInput.value = '';
+                renderCurrentLevel();
+                return;
+            }
             if (navStack.length > 0) {
                 currentNode = navStack.pop();
             } else {
                 currentNode = null;
             }
-            searchTerm = '';
-            const searchInput = document.getElementById('search-input');
-            if (searchInput) searchInput.value = '';
             renderCurrentLevel();
         });
     }
@@ -1478,13 +1573,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
-            if (!currentNode) {
-                return;
-            }
-            const children = getChildren(currentNode.node);
-            if (children.length > 0 && children[0].type === 'product') {
-                renderItems(children);
+            const term = e.target.value.trim();
+            if (term.length >= 2) {
+                isSearchActive = true;
+                searchTerm = term;
+                const results = performSearch(term);
+                renderSearchResults(results);
+            } else {
+                if (isSearchActive) {
+                    isSearchActive = false;
+                    searchTerm = '';
+                    renderCurrentLevel();
+                }
             }
         });
     }
