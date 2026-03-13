@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import json
 import requests
 import os
@@ -66,19 +66,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "admin_orders":
         await show_orders(query, context)
     elif query.data == "admin_add_product":
-        await query.edit_message_text("Функция добавления товара в разработке...")
+        await query.edit_message_text("➕ Функция добавления товара в разработке...")
     elif query.data == "admin_edit_product":
-        await query.edit_message_text("Функция редактирования товара в разработке...")
+        await query.edit_message_text("✏️ Функция редактирования товара в разработке...")
     elif query.data == "admin_delete_product":
-        await query.edit_message_text("Функция удаления товара в разработке...")
+        await query.edit_message_text("❌ Функция удаления товара в разработке...")
     elif query.data == "admin_users":
-        await query.edit_message_text("Список пользователей в разработке...")
+        await query.edit_message_text("👥 Список пользователей в разработке...")
     elif query.data == "admin_settings":
         await show_settings(query, context)
+    elif query.data == "back_to_admin":
+        await back_to_admin(query, context)
 
 async def show_stats(query, context):
     """Показывает статистику магазина"""
-    # Здесь можно добавить реальную статистику из базы данных
     stats_text = (
         "📊 **Статистика магазина**\n\n"
         "👥 Всего пользователей: 0\n"
@@ -101,7 +102,6 @@ async def show_stats(query, context):
 
 async def show_orders(query, context):
     """Показывает список последних заказов"""
-    # Здесь можно добавить реальные заказы из базы данных
     orders_text = (
         "📦 **Последние заказы**\n\n"
         "Нет заказов для отображения."
@@ -120,7 +120,7 @@ async def show_settings(query, context):
     """Показывает настройки магазина"""
     settings_text = (
         "⚙️ **Настройки магазина**\n\n"
-        "• URL магазина: " + APP_URL + "\n"
+        f"• URL магазина: {APP_URL}\n"
         "• Режим: Рабочий\n"
         "• Уведомления: Включены\n\n"
         "Дополнительные настройки в разработке..."
@@ -131,6 +131,28 @@ async def show_settings(query, context):
     
     await query.edit_message_text(
         settings_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def back_to_admin(query, context):
+    """Возвращает в главное меню админ-панели"""
+    keyboard = [
+        [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton("📦 Все заказы", callback_data="admin_orders")],
+        [InlineKeyboardButton("➕ Добавить товар", callback_data="admin_add_product")],
+        [InlineKeyboardButton("✏️ Редактировать товар", callback_data="admin_edit_product")],
+        [InlineKeyboardButton("❌ Удалить товар", callback_data="admin_delete_product")],
+        [InlineKeyboardButton("👥 Пользователи", callback_data="admin_users")],
+        [InlineKeyboardButton("⚙️ Настройки", callback_data="admin_settings")],
+        [InlineKeyboardButton("🛍 Перейти в магазин", web_app={"url": f"{APP_URL}/"})]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🔐 **Админ-панель**\n\n"
+        "Добро пожаловать в панель управления магазином!\n"
+        "Выберите действие:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -187,6 +209,7 @@ def main():
     
     print("Бот запущен...")
     print(f"ID администратора: {ADMIN_ID}")
+    print(f"URL магазина: {APP_URL}")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
