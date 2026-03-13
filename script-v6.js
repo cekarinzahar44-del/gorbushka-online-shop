@@ -1354,11 +1354,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return product.name;
     }
 
-    // Функция для нормализации текста (регистр + транслитерация)
+    // Улучшенная функция нормализации для поиска
     function normalizeText(text) {
         if (!text) return '';
-        const lower = text.toLowerCase();
-        // Простая транслитерация для русских букв
+        
+        // Приводим к нижнему регистру
+        let lower = text.toLowerCase().trim();
+        
+        // Транслитерация русских букв в английские
         const translitMap = {
             'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
             'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
@@ -1366,24 +1369,56 @@ document.addEventListener('DOMContentLoaded', function() {
             'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
             'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
         };
+        
+        // Создаём два варианта: оригинал (уже в нижнем регистре) и транслитерированный
         let translit = '';
         for (let char of lower) {
-            if (translitMap[char]) {
+            if (translitMap[char] !== undefined) {
                 translit += translitMap[char];
             } else {
                 translit += char;
             }
         }
-        return translit;
+        
+        // Возвращаем массив вариантов для поиска
+        return { original: lower, translit: translit };
     }
 
     function performSearch(term) {
         if (!term || term.length < 2) return [];
+        
         const normalizedTerm = normalizeText(term);
+        
         return allProducts.filter(product => {
             const normalizedName = normalizeText(product.name);
             const normalizedDesc = normalizeText(product.description);
-            return normalizedName.includes(normalizedTerm) || normalizedDesc.includes(normalizedTerm);
+            
+            // Проверяем совпадение в оригинале (регистронезависимо)
+            const nameMatchOriginal = normalizedName.original.includes(normalizedTerm.original);
+            const descMatchOriginal = normalizedDesc.original.includes(normalizedTerm.original);
+            
+            // Проверяем совпадение в транслитерации
+            const nameMatchTranslit = normalizedName.translit.includes(normalizedTerm.translit);
+            const descMatchTranslit = normalizedDesc.translit.includes(normalizedTerm.translit);
+            
+            // Проверяем частичное совпадение (для случаев "iphone" vs "айфон")
+            // Разбиваем запрос на слова
+            const termWords = normalizedTerm.original.split(/\s+/);
+            const nameWords = normalizedName.original.split(/\s+/);
+            
+            let wordMatch = false;
+            for (let word of termWords) {
+                if (word.length < 3) continue; // Пропускаем короткие слова
+                for (let nameWord of nameWords) {
+                    if (nameWord.includes(word) || word.includes(nameWord)) {
+                        wordMatch = true;
+                        break;
+                    }
+                }
+                if (wordMatch) break;
+            }
+            
+            return nameMatchOriginal || descMatchOriginal || nameMatchTranslit || descMatchTranslit || wordMatch;
         });
     }
 
@@ -1432,7 +1467,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!catalogContent) return;
 
         if (isSearchActive) {
-            // Уже в поиске, ничего не делаем
             return;
         }
 
