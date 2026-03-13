@@ -113,6 +113,33 @@ h2 {
     color: white;
 }
 
+/* Строка поиска */
+.search-container {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--hint-color);
+    border-radius: 30px;
+    background: var(--secondary-bg);
+    color: var(--text-color);
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+    border-color: var(--button-color);
+    box-shadow: 0 0 0 3px rgba(0,122,255,0.1);
+}
+
+.search-input::placeholder {
+    color: var(--hint-color);
+}
+
 /* Сетка категорий */
 .categories-grid {
     display: grid;
