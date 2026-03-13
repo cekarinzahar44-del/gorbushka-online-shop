@@ -1283,6 +1283,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function extractEmoji(name) {
+        if (!name) return '📦';
+        const firstChar = name.charAt(0);
+        if (firstChar.charCodeAt(0) > 0x2FFF) return firstChar;
+        return '📦';
+    }
+
     catalogData.categories.forEach(cat => collectAllProducts(cat));
     console.log(`Всего товаров для поиска: ${allProducts.length}`);
 
@@ -1307,13 +1314,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentNode = null;
     let searchTerm = '';
     let isSearchActive = false;
-
-    function extractEmoji(name) {
-        if (!name) return '📦';
-        const firstChar = name.charAt(0);
-        if (firstChar.charCodeAt(0) > 0x2FFF) return firstChar;
-        return '📦';
-    }
 
     function getRootCategories() {
         return catalogData.categories.map(cat => ({
