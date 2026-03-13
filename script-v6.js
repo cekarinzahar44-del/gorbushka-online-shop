@@ -1262,19 +1262,38 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     // ================== КОНЕЦ КАТАЛОГА ==================
 
+    // ---------- ФУНКЦИЯ ТРАНСЛИТЕРАЦИИ (РУССКИЙ -> АНГЛИЙСКИЙ) ----------
+    function transliterate(text) {
+        const ru = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+            'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        };
+        
+        return text.toLowerCase().split('').map(char => ru[char] || char).join('');
+    }
+
     // ---------- СОЗДАЕМ ПЛОСКИЙ СПИСОК ВСЕХ ТОВАРОВ ----------
     const allProducts = [];
     
     function collectAllProducts(node) {
         if (node.products) {
             node.products.forEach(p => {
+                const name = p.name;
+                const nameLower = name.toLowerCase();
+                const nameTranslit = transliterate(nameLower);
+                
                 allProducts.push({
                     id: p.id,
-                    name: p.name,
-                    nameLower: p.name.toLowerCase(),
+                    name: name,
+                    nameLower: nameLower,
+                    nameTranslit: nameTranslit,
                     price: p.price,
                     description: p.description || '',
-                    descLower: (p.description || '').toLowerCase()
+                    descLower: (p.description || '').toLowerCase(),
+                    descTranslit: transliterate((p.description || '').toLowerCase())
                 });
             });
         }
@@ -1291,7 +1310,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentNode = null;
     let searchMode = false;
 
-    // Функция для получения корневых категорий
     function getRootCategories() {
         return catalogData.categories.map(cat => ({
             id: cat.id,
@@ -1301,11 +1319,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
     }
 
-    // Функция для получения дочерних элементов
     function getChildren(node) {
         if (!node) return [];
         
-        // Если есть подкатегории, показываем их
         if (node.subcategories && node.subcategories.length > 0) {
             return node.subcategories.map(sub => ({
                 id: sub.id,
@@ -1315,7 +1331,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }));
         }
         
-        // Если есть товары, показываем их
         if (node.products && node.products.length > 0) {
             return node.products.map(product => ({
                 id: product.id,
@@ -1330,7 +1345,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return [];
     }
 
-    // Функция для отображения элементов
     function renderItems(items) {
         const catalogContent = document.getElementById('catalog-content');
         if (!catalogContent) return;
@@ -1345,7 +1359,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const isProducts = items[0].type === 'product';
 
         if (isProducts) {
-            // Показываем товары
             const grid = document.createElement('div');
             grid.className = 'products-grid';
             items.forEach(item => {
@@ -1361,14 +1374,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             catalogContent.appendChild(grid);
 
-            // Добавляем обработчики для кнопок
             document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     addToCart(e.target.dataset.id);
                 });
             });
         } else {
-            // Показываем категории
             const grid = document.createElement('div');
             grid.className = 'categories-grid';
             items.forEach(item => {
@@ -1376,7 +1387,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.className = 'category-card';
                 card.innerHTML = `<div class="category-name">${item.name}</div>`;
                 card.addEventListener('click', () => {
-                    // Сохраняем текущий узел в стек и переходим в выбранную категорию
                     navStack.push(currentNode);
                     currentNode = item;
                     renderCurrentLevel();
@@ -1387,23 +1397,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Функция для отображения текущего уровня
     function renderCurrentLevel() {
         const catalogContent = document.getElementById('catalog-content');
         const backBtn = document.getElementById('back-to-categories');
 
         if (!catalogContent) return;
 
-        // Если мы в режиме поиска, не меняем содержимое
         if (searchMode) return;
 
         if (!currentNode) {
-            // Корневой уровень - показываем все категории
             const rootItems = getRootCategories();
             renderItems(rootItems);
             if (backBtn) backBtn.style.display = 'none';
         } else {
-            // Показываем дочерние элементы текущего узла
             const children = getChildren(currentNode.node);
             if (children.length > 0) {
                 renderItems(children);
@@ -1415,16 +1421,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ---------- ФУНКЦИИ ПОИСКА ----------
+    // ---------- УМНЫЙ ПОИСК ----------
     function searchProducts(query) {
         if (!query || query.length < 2) return [];
         
         const searchTerm = query.toLowerCase().trim();
+        const searchTranslit = transliterate(searchTerm);
         
         return allProducts.filter(product => {
-            // Простая проверка на вхождение подстроки
-            return product.nameLower.includes(searchTerm) || 
-                   product.descLower.includes(searchTerm);
+            // Поиск по оригинальному названию (рус/англ)
+            const nameMatch = product.nameLower.includes(searchTerm);
+            
+            // Поиск по транслитерированному названию (для поиска "айфон" -> "iphone")
+            const nameTranslitMatch = product.nameTranslit.includes(searchTranslit);
+            
+            // Поиск по описанию
+            const descMatch = product.descLower.includes(searchTerm) || 
+                            product.descTranslit.includes(searchTranslit);
+            
+            return nameMatch || nameTranslitMatch || descMatch;
         });
     }
 
@@ -1477,7 +1492,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('Ошибка загрузки корзины');
     }
 
-    // Функции корзины
     function addToCart(productId) {
         cart[productId] = (cart[productId] || 0) + 1;
         updateCartUI();
@@ -1543,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', function() {
             itemDiv.innerHTML = `
                 <div>
                     <div>${product.name}</div>
-                    <div>${product.price.toLocaleString()} ₽ x ${qty}</div>
+                    <div>${product.price.toLocaleString()} ₽ x ${qty} = ${itemTotal.toLocaleString()} ₽</div>
                 </div>
                 <div>
                     <button onclick="changeQuantity('${id}', -1)">-</button>
@@ -1566,7 +1580,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const backBtn = document.getElementById('back-to-categories');
     const searchInput = document.getElementById('search-input');
 
-    // Переключение вкладок
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const tabId = tab.dataset.tab;
@@ -1576,7 +1589,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById(`${tabId}-tab`).classList.add('active');
 
             if (tabId === 'catalog') {
-                // Сбрасываем навигацию при переходе на каталог
                 navStack = [];
                 currentNode = null;
                 searchMode = false;
@@ -1586,11 +1598,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Кнопка "Назад"
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             if (searchMode) {
-                // Если были в поиске, выходим из него
                 searchMode = false;
                 if (searchInput) searchInput.value = '';
                 renderCurrentLevel();
@@ -1605,7 +1615,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Поиск
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
