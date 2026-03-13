@@ -11,7 +11,7 @@ if (user && greetingEl) {
     greetingEl.innerText = `Добро пожаловать, ${user.first_name}!`;
 }
 
-// ========== ВАШ ПОЛНЫЙ КАТАЛОГ (вставлен сюда) ==========
+// ========== ВАШ ПОЛНЫЙ КАТАЛОГ ==========
 const catalogData = {
   "categories": [
     {
@@ -1469,12 +1469,14 @@ function addToCart(productId) {
     cart[productId] = (cart[productId] || 0) + 1;
     saveCart();
     updateCartUI();
+    updateMainButton();
 }
 
 function removeFromCart(productId) {
     delete cart[productId];
     saveCart();
     updateCartUI();
+    updateMainButton();
 }
 
 function changeQuantity(productId, delta) {
@@ -1486,6 +1488,7 @@ function changeQuantity(productId, delta) {
         cart[productId] = newQty;
         saveCart();
         updateCartUI();
+        updateMainButton();
     }
 }
 
@@ -1547,6 +1550,19 @@ function updateCartUI() {
     if (totalSpan) totalSpan.innerText = `Итого: ${totalSum.toLocaleString()} ₽`;
 }
 
+// Показываем кнопку "Оформить заказ" когда есть товары
+function updateMainButton() {
+    if (!tg) return;
+    
+    const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+    if (totalItems > 0) {
+        tg.MainButton.setText(`Оформить заказ (${totalItems})`);
+        tg.MainButton.show();
+    } else {
+        tg.MainButton.hide();
+    }
+}
+
 // Отправка заказа
 function sendOrder() {
     if (!tg) {
@@ -1598,6 +1614,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Показываем категории
     renderCurrentLevel();
+    
+    // Показываем кнопку если есть товары
+    updateMainButton();
     
     // Настройка вкладок
     const tabs = document.querySelectorAll('.tab-button');
@@ -1664,6 +1683,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tg) {
         tg.MainButton.setText('Оформить заказ');
         tg.MainButton.onClick(sendOrder);
-        tg.MainButton.hide(); // Скрыта, пока корзина пуста
+        updateMainButton();
     }
 });
+
+// Делаем функции глобальными
+window.changeQuantity = changeQuantity;
+window.removeFromCart = removeFromCart;
