@@ -1256,7 +1256,6 @@ let allProducts = [];
 
 function collectAllProducts() {
     allProducts = [];
-    
     function collect(node) {
         if (node.products) {
             node.products.forEach(p => {
@@ -1272,7 +1271,6 @@ function collectAllProducts() {
             node.subcategories.forEach(sub => collect(sub));
         }
     }
-    
     catalogData.categories.forEach(cat => collect(cat));
     console.log('Загружено товаров:', allProducts.length);
 }
@@ -1329,22 +1327,17 @@ function getChildren(node) {
 function renderItems(items) {
     const content = document.getElementById('catalog-content');
     if (!content) return;
-    
     content.innerHTML = '';
-    
     if (items.length === 0) {
         content.innerHTML = '<div class="empty-cart">Пусто</div>';
         return;
     }
-    
     const isProducts = items[0].type === 'product';
     const grid = document.createElement('div');
     grid.className = isProducts ? 'products-grid' : 'categories-grid';
-    
     items.forEach(item => {
         const card = document.createElement('div');
         card.className = isProducts ? 'product-card' : 'category-card';
-        
         if (isProducts) {
             card.innerHTML = `
                 <div class="product-name">${item.name}</div>
@@ -1360,12 +1353,9 @@ function renderItems(items) {
                 renderCurrentLevel();
             });
         }
-        
         grid.appendChild(card);
     });
-    
     content.appendChild(grid);
-    
     if (isProducts) {
         document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
             btn.addEventListener('click', (e) => addToCart(e.target.dataset.id));
@@ -1375,9 +1365,7 @@ function renderItems(items) {
 
 function renderCurrentLevel() {
     const backBtn = document.getElementById('back-btn');
-    
     if (searchMode) return;
-    
     if (!currentNode) {
         renderItems(getRootCategories());
         if (backBtn) backBtn.style.display = 'none';
@@ -1398,13 +1386,11 @@ function searchProducts(query) {
     if (query.length < 2) return [];
     const searchTerm = query.toLowerCase();
     const searchTranslit = transliterate(searchTerm);
-    
     return allProducts.filter(p => {
         const nameLower = p.name.toLowerCase();
         const nameTranslit = transliterate(nameLower);
         const descLower = (p.description || '').toLowerCase();
         const descTranslit = transliterate(descLower);
-        
         return nameLower.includes(searchTerm) ||
                nameTranslit.includes(searchTranslit) ||
                descLower.includes(searchTerm) ||
@@ -1415,18 +1401,14 @@ function searchProducts(query) {
 function showSearchResults(results) {
     const content = document.getElementById('catalog-content');
     const backBtn = document.getElementById('back-btn');
-    
     content.innerHTML = '';
-    
     if (results.length === 0) {
         content.innerHTML = '<div class="empty-cart">Ничего не найдено</div>';
         backBtn.style.display = 'inline-block';
         return;
     }
-    
     const grid = document.createElement('div');
     grid.className = 'products-grid';
-    
     results.forEach(p => {
         const card = document.createElement('div');
         card.className = 'product-card';
@@ -1438,13 +1420,10 @@ function showSearchResults(results) {
         `;
         grid.appendChild(card);
     });
-    
     content.appendChild(grid);
-    
     document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
         btn.addEventListener('click', (e) => addToCart(e.target.dataset.id));
     });
-    
     backBtn.style.display = 'inline-block';
 }
 
@@ -1457,6 +1436,7 @@ function loadCart() {
         if (saved) cart = JSON.parse(saved);
     } catch (e) {}
     updateCartUI();
+    updateMainButton();
 }
 
 function saveCart() {
@@ -1496,29 +1476,21 @@ function updateCartUI() {
     const container = document.getElementById('cart-items');
     const totalSpan = document.getElementById('cart-total');
     const countSpan = document.getElementById('cart-count');
-    
     const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
     if (countSpan) countSpan.innerText = totalItems;
-    
     if (!container) return;
-    
     container.innerHTML = '';
-    
     if (totalItems === 0) {
         container.innerHTML = '<div class="empty-cart">Корзина пуста</div>';
         if (totalSpan) totalSpan.innerText = 'Итого: 0 ₽';
         return;
     }
-    
     let totalSum = 0;
-    
     for (const [id, qty] of Object.entries(cart)) {
         const product = allProducts.find(p => p.id === id);
         if (!product) continue;
-        
         const itemTotal = product.price * qty;
         totalSum += itemTotal;
-        
         const div = document.createElement('div');
         div.className = 'cart-item';
         div.innerHTML = `
@@ -1535,8 +1507,6 @@ function updateCartUI() {
         `;
         container.appendChild(div);
     }
-    
-    // Добавляем обработчики для кнопок корзины
     document.querySelectorAll('.cart-decr').forEach(btn => {
         btn.addEventListener('click', (e) => changeQuantity(e.target.dataset.id, -1));
     });
@@ -1546,21 +1516,7 @@ function updateCartUI() {
     document.querySelectorAll('.cart-remove').forEach(btn => {
         btn.addEventListener('click', (e) => removeFromCart(e.target.dataset.id));
     });
-    
     if (totalSpan) totalSpan.innerText = `Итого: ${totalSum.toLocaleString()} ₽`;
-}
-
-// Показываем кнопку "Оформить заказ" когда есть товары
-function updateMainButton() {
-    if (!tg) return;
-    
-    const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
-    if (totalItems > 0) {
-        tg.MainButton.setText(`Оформить заказ (${totalItems})`);
-        tg.MainButton.show();
-    } else {
-        tg.MainButton.hide();
-    }
 }
 
 // Отправка заказа
@@ -1569,10 +1525,10 @@ function sendOrder() {
         alert('❌ Telegram WebApp не доступен');
         return;
     }
-    
+
     const items = [];
     let total = 0;
-    
+
     for (const [id, qty] of Object.entries(cart)) {
         const product = allProducts.find(p => p.id === id);
         if (product) {
@@ -1586,44 +1542,53 @@ function sendOrder() {
             total += product.price * qty;
         }
     }
-    
+
     const order = {
         user: user ? { id: user.id, first_name: user.first_name } : null,
         items: items,
         total: total,
         date: new Date().toISOString()
     };
-    
+
+    // Отправляем данные боту
     tg.sendData(JSON.stringify(order));
+    
+    // Скрываем кнопку и показываем уведомление
     tg.MainButton.hide();
     tg.showAlert('✅ Заказ отправлен!');
     
-    // Очищаем корзину после отправки
+    // Очищаем корзину
     cart = {};
     saveCart();
     updateCartUI();
+    updateMainButton();
+}
+
+// Показываем кнопку "Оформить заказ" когда есть товары
+function updateMainButton() {
+    if (!tg) return;
+    const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+    if (totalItems > 0) {
+        tg.MainButton.setText(`Оформить заказ (${totalItems})`);
+        tg.MainButton.show();
+    } else {
+        tg.MainButton.hide();
+    }
 }
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-    // Собираем все товары из каталога
     collectAllProducts();
-    
-    // Загружаем корзину
     loadCart();
-    
-    // Показываем категории
     renderCurrentLevel();
-    
-    // Показываем кнопку если есть товары
     updateMainButton();
-    
+
     // Настройка вкладок
     const tabs = document.querySelectorAll('.tab-button');
     const contents = document.querySelectorAll('.tab-content');
     const backBtn = document.getElementById('back-btn');
     const searchInput = document.getElementById('search-input');
-    
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const tabId = tab.dataset.tab;
@@ -1631,7 +1596,6 @@ document.addEventListener('DOMContentLoaded', () => {
             contents.forEach(c => c.classList.remove('active'));
             tab.classList.add('active');
             document.getElementById(`${tabId}-tab`).classList.add('active');
-            
             if (tabId === 'catalog') {
                 navStack = [];
                 currentNode = null;
@@ -1639,13 +1603,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (searchInput) searchInput.value = '';
                 renderCurrentLevel();
             }
-            
             if (tabId === 'cart') {
                 updateCartUI();
             }
         });
     });
-    
+
     // Кнопка "Назад"
     if (backBtn) {
         backBtn.addEventListener('click', () => {
@@ -1663,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCurrentLevel();
         });
     }
-    
+
     // Поиск
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -1678,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // Настройка главной кнопки Telegram
     if (tg) {
         tg.MainButton.setText('Оформить заказ');
