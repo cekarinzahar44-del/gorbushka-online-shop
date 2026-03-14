@@ -11,7 +11,7 @@ if (user && greetingEl) {
     greetingEl.innerText = `Добро пожаловать, ${user.first_name}!`;
 }
 
-// ========== ВАШ ПОЛНЫЙ КАТАЛОГ ==========
+// ========== ВАШ ПОЛНЫЙ КАТАЛОГ (JSON) ==========
 const catalogData = {
   "categories": [
     {
